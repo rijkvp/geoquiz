@@ -25,7 +25,7 @@ class State {
 }
 
 class CountryInfo {
-    iso3: string;
+    iso2: string;
     emoji: string;
     name: string;
     latitude: number;
@@ -42,15 +42,10 @@ class Country {
     states: State[];
 }
 
-enum GameState {
-    Home,
-    Practise,
-}
-
 class Game {
     #state?: string;
 
-    #map: OlMap;
+    #map: OLMap;
     #labelLayer: VectorLayer;
     #polygonLayer: VectorLayer;
     #popupOverlay: Overlay;
@@ -102,21 +97,51 @@ class Game {
         this.startState();
     }
 
-    async load() {
-        this.#countries = await fetch('data/countries.json')
+
+    switchState(state?: string) {
+        console.log('switch state to', state);
+        this.endState();
+        this.#state = state;
+        history.pushState(state, '', state != null ? `?c=${state}` : '')
+        this.startState();
+    }
+
+    endState() {
+        console.log('end state', this.#state);
+        if (!this.#state) {
+            this.#labelLayer.setSource(null);
+            this.#polygonLayer.setSource(null);
+            this.#popupContainer.remove();
+        } else {
+
+        }
+    }
+
+    startState() {
+        console.log('start state', this.#state);
+        if (!this.#state) {
+            this.loadWorld();
+            this.loadCountryPolygons();
+        } else {
+            this.loadCountry();
+        }
+    }
+
+    async loadWorld() {
+        this.#countries = await fetch('countries.json')
             .then((res) =>
                 res.json()
             );
         this.#labelLayer.setSource(
             new VectorSource({
                 features: new Collection(
-                    Object.entries(this.#countries).map(([iso3, info]) => {
+                    Object.entries(this.#countries).map(([iso2, info]) => {
                         const feature = new Feature({
                             geometry: new Point(
                                 fromLonLat([info.long, info.lat])
                             ),
                         });
-                        feature.set('iso3', iso3);
+                        feature.set('iso2', iso2);
                         feature.set('label', {
                             short: info.emoji,
                             long: `${info.emoji} ${info.name}`,
@@ -130,8 +155,8 @@ class Game {
         );
     }
 
-    async loadMapPolygons() {
-        let countriesOverlay = await fetch('data/countries.geojson')
+    async loadCountryPolygons() {
+        let countriesOverlay = await fetch('maps/countries-optimized.geojson')
             .then((res) =>
                 res.json()
             );
@@ -145,48 +170,25 @@ class Game {
         this.#polygonLayer.setStyle(
             new Style({
                 stroke: new Stroke({
-                    color: 'red',
+                    color: 'blue',
                     width: 2,
                 }),
                 fill: new Fill({
-                    color: 'rgba(255, 0, 0, 0.1)',
+                    color: 'rgba(0, 0, 255, 0.1)',
                 }),
         }));
     }
 
-    switchState(state?: string) {
-        console.log('switch state to', state);
-        this.endState();
-        this.#state = state;
-        history.pushState(state, '', state != null ? `?c=${state}` : '')
-        this.startState();
-    }
+    async loadCountry() {
 
-    endState() {
-        console.log('end state', this.#state);
-        if (!this.#state) {
-            this.#polygonLayer.clear();
-        } else {
-
-        }
-    }
-
-    startState() {
-        console.log('start state', this.#state);
-        if (!this.#state) {
-            this.load();
-            this.loadMapPolygons();
-        } else {
-
-        }
     }
 
     mapClick(event) {
         let clickHit = false;
         this.#map.forEachFeatureAtPixel(event.pixel, (feature) => {
-            const iso3 = feature.get('iso3');
-            this.#selected = iso3;
-            const info = this.#countries[iso3];
+            const iso2 = feature.get('iso2');
+            this.#selected = iso2;
+            const info = this.#countries[iso2];
             this.#popupText.innerText = `${info.emoji} ${info.name}`;
             clickHit = true;
         });
